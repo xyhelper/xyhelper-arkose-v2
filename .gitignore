@@ -1,3 +1,4 @@
 main
 temp/
 .DS_Store
+config.yaml

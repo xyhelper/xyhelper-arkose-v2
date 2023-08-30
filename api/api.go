@@ -90,18 +90,38 @@ func GetToken(r *ghttp.Request) {
 
 	headers := harRequest.Headers
 	Headers := g.Map{}
+	cliCookies, err := reqCli.Cookies("https://tcr9i.chat.openai.com")
+	if err != nil {
+		g.Log().Error(ctx, getRealIP(r), err.Error())
+		r.Response.WriteJsonExit(g.Map{
+			"code": 0,
+			"msg":  err.Error(),
+		})
+		return
+	}
+	g.Dump(cliCookies)
 	for _, v := range headers {
 		// 如果v.Name 以 : 开头，那么就是一个特殊的请求头，需要特殊处理
 		if gstr.HasPrefix(v.Name, ":") {
 			continue
 		}
-		if v.Name == "cookie" {
+		if gstr.Equal(v.Name, "Cookie") {
+			if len(cliCookies) > 0 {
+				Headers["Cookie"] = v.Value + "; " + cliCookies[0].Name + "=" + cliCookies[0].Value
+				continue
+			}
 			// 如果是cookie,那么就需要特殊处理, 追加一个 名称和值都随机的 cookie
 			Headers["Cookie"] = v.Value + "; " + helper.GenerateRandomString() + "=" + helper.GenerateRandomString()
 			continue
 		}
+		// "Accept-Language" 强制为 en-US,en;q=0.5
+		if gstr.Equal(v.Name, "Accept-Language") {
+			Headers["Accept-Language"] = "en-US,en;q=0.5"
+			continue
+		}
 		Headers[v.Name] = v.Value
 	}
+	g.Dump(Headers)
 	payload := harRequest.PostData.Text
 	// 以&分割转换为数组
 	payloadArray := gstr.Split(payload, "&")
@@ -130,6 +150,7 @@ func GetToken(r *ghttp.Request) {
 	}
 	defer response.Close()
 	text := response.Text()
+	gjson.New(text).Dump()
 	token := gjson.New(text).Get("token").String()
 	if token == "" {
 		g.Log().Error(ctx, getRealIP(r), text)
